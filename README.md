@@ -36,25 +36,6 @@ ACME_EMAIL=
 
 Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By default, it reuses `BACKEND_IP` and `BACKEND_PORT`, which is the usual setup when HTTP and WebSocket traffic belong to the same application. Set `PROXY_SOCKET_IP` and `PROXY_SOCKET_PORT` only when the WebSocket service uses a different backend.
 
-## Additional domains
-
-The `.env` configuration always defines the primary single-domain proxy and remains backward compatible. If additional domains are required, add one valid entry per line to `domains.conf`:
-
-```text
-DOMAIN, BACKEND_IP, BACKEND_PORT, PROXY_SOCKET
-second.example.com, backend-service, 8080, false
-```
-
-The primary `.env` domain remains the `Example` virtual host. Each line in `domains.conf` creates an additional virtual host named from the domain, an independent proxy External App, an HTTP/HTTPS listener mapping, and its own ACME-enabled VHost configuration. The primary VHost uses `proxy_backend`; additional VHosts use `proxy_backend2`, `proxy_backend3`, and so on. Do not add `OLS_IMAGE` or `ACME_EMAIL` to `domains.conf`; those settings remain global in `.env`.
-
-`PROXY_SOCKET` must be exactly `true` or `false`. When it is `true`, the WebSocket backend uses the same host and port from that line. The parser rejects missing fields, invalid domains, invalid backend hosts, invalid ports, invalid Boolean values, duplicate domains, and extra comma-separated fields.
-
-The file is mounted read-only into the container, so changing `domains.conf` does not require an image rebuild. Restart the proxy after changes:
-
-```sh
-docker compose up -d
-```
-
 ## Connect another Docker stack
 
 Compose creates a shared bridge network named `ls-net`. Any backend container that should be reached by its Docker service or container name must join this network.
@@ -119,6 +100,25 @@ docker compose up -d --build
 ```
 
 ## FAQ
+
+### How to add additional domains
+
+The `.env` configuration always defines the primary single-domain proxy and remains backward compatible. If additional domains are required, add one valid entry per line to `domains.conf`:
+
+```text
+DOMAIN, BACKEND_IP, BACKEND_PORT, PROXY_SOCKET
+second.example.com, backend-service, 8080, false
+```
+
+The primary `.env` domain remains the `Example` virtual host. Each line in `domains.conf` creates an additional virtual host named from the domain, an independent proxy External App, an HTTP/HTTPS listener mapping, and its own ACME-enabled VHost configuration. The primary VHost uses `proxy_backend`; additional VHosts use `proxy_backend2`, `proxy_backend3`, and so on. Do not add `OLS_IMAGE` or `ACME_EMAIL` to `domains.conf`; those settings remain global in `.env`.
+
+`PROXY_SOCKET` must be exactly `true` or `false`. When it is `true`, the WebSocket backend uses the same host and port from that line. The parser rejects missing fields, invalid domains, invalid backend hosts, invalid ports, invalid Boolean values, duplicate domains, and extra comma-separated fields.
+
+The file is mounted read-only into the container, so changing `domains.conf` does not require an image rebuild. Restart the proxy after changes:
+
+```sh
+docker compose up -d
+```
 
 ### How to visit WebAdmin
 
