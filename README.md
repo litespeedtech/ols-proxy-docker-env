@@ -10,7 +10,7 @@ This project runs the official `litespeedtech/openlitespeed` image as a Dockeriz
 The configuration includes:
 
 - A per-VH OLS proxy External App (`proxy_backend`, `proxy_backend2`, and so on).
-- A RewriteRule that proxies all requests to the backend.
+- Selectable RewriteRule or proxy-context routing to the backend.
 - HTTP and HTTPS listeners on ports `80` and `443`, including UDP `443` for HTTP/3 QUIC.
 - OpenLiteSpeed ACME certificate management (domain must point to this server).
 
@@ -28,6 +28,10 @@ BACKEND_IP=192.168.0.1
 BACKEND_PORT=1234
 DOMAIN=www.example.com
 ACME_EMAIL=
+PROXY_SOCKET=false
+PROXY_METHOD=rewrite
+# Context mode only:
+# HEADER_SET=RequestHeader set Origin "https://www.example.com"
 ```
 
 `DOMAIN` is used for the OLS listener mapping and is sent to the backend as the `Host` header.
@@ -35,6 +39,17 @@ ACME_EMAIL=
 `BACKEND_IP` is the backend host, not necessarily a numeric IP address. It may be an IP address, DNS hostname, or Docker service/container name such as `backend-service` when both containers share a Docker network. Use the backend container port in that case; for example, `backend-service:8080`, not the host-published port from a `host-port:container-port` mapping.
 
 Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By default, it reuses `BACKEND_IP` and `BACKEND_PORT`, which is the usual setup when HTTP and WebSocket traffic belong to the same application. Set `PROXY_SOCKET_IP` and `PROXY_SOCKET_PORT` only when the WebSocket service uses a different backend.
+
+`PROXY_METHOD=R` or `PROXY_METHOD=rewrite` uses the default RewriteRule proxy. `PROXY_METHOD=C` or `PROXY_METHOD=context` uses an OpenLiteSpeed proxy context. Values are case-insensitive.
+
+Context mode optionally accepts one request-header directive through `HEADER_SET`, for example:
+
+```dotenv
+PROXY_METHOD=context
+HEADER_SET=RequestHeader set Origin "https://www.example.com"
+```
+
+For safety, `HEADER_SET` must exactly match `RequestHeader set Header-Name "value"`. Newlines, backslashes, braces, extra quotes, unsupported characters, values longer than 1024 characters, and transport-sensitive headers such as `Host`, `Content-Length`, and `Transfer-Encoding` are rejected.
 
 ## Connect another Docker stack
 
@@ -106,13 +121,15 @@ docker compose up -d --build
 The `.env` configuration always defines the primary single-domain proxy and remains backward compatible. If additional domains are required, add one valid entry per line to `domains.conf`:
 
 ```text
-DOMAIN, BACKEND_IP, BACKEND_PORT, PROXY_SOCKET
-second.example.com, backend-service, 8080, false
+DOMAIN, BACKEND_IP, BACKEND_PORT, PROXY_SOCKET, PROXY_METHOD, HEADER_SET
+second.example.com, backend-service, 8080, false, context, RequestHeader set Origin "https://www.example.com"
 ```
 
 The primary `.env` domain remains the `Example` virtual host. Each line in `domains.conf` creates an additional virtual host named from the domain, an independent proxy External App, an HTTP/HTTPS listener mapping, and its own ACME-enabled VHost configuration. The primary VHost uses `proxy_backend`; additional VHosts use `proxy_backend2`, `proxy_backend3`, and so on. Do not add `OLS_IMAGE` or `ACME_EMAIL` to `domains.conf`; those settings remain global in `.env`.
 
-`PROXY_SOCKET` must be exactly `true` or `false`. When it is `true`, the WebSocket backend uses the same host and port from that line. The parser rejects missing fields, invalid domains, invalid backend hosts, invalid ports, invalid Boolean values, duplicate domains, and extra comma-separated fields.
+`PROXY_METHOD` and `HEADER_SET` are optional for backward compatibility: an existing four-field line defaults to RewriteRule mode. A five-field line selects the proxy method, and a six-field line may add one validated header in Context mode. Because fields are comma-separated, `HEADER_SET` cannot contain a comma.
+
+`PROXY_SOCKET` must be exactly `true` or `false`. When it is `true`, the WebSocket backend uses the same host and port from that line. The parser rejects missing fields, invalid domains, invalid backend hosts, invalid ports, invalid Boolean values, invalid proxy methods or headers, duplicate domains, and extra comma-separated fields.
 
 The file is mounted read-only into the container, so changing `domains.conf` does not require an image rebuild. Restart the proxy after changes:
 

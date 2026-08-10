@@ -8,6 +8,8 @@ set -Eeuo pipefail
 PROXY_SOCKET="${PROXY_SOCKET:-false}"
 PROXY_SOCKET_IP="${PROXY_SOCKET_IP:-$BACKEND_IP}"
 PROXY_SOCKET_PORT="${PROXY_SOCKET_PORT:-$BACKEND_PORT}"
+PROXY_METHOD="${PROXY_METHOD:-rewrite}"
+HEADER_SET="${HEADER_SET:-}"
 DOMAINS_CONFIG=/etc/ols-proxy/domains.conf
 
 trim() {
@@ -51,10 +53,54 @@ validate_socket() {
     fi
 }
 
+normalize_proxy_method() {
+    local name="$1"
+    local value="${2,,}"
+    case "$value" in
+        r|rewrite)
+            printf '%s' rewrite
+            ;;
+        c|context)
+            printf '%s' context
+            ;;
+        *)
+            echo "$name must be R, rewrite, C, or context (case-insensitive)" >&2
+            exit 1
+            ;;
+    esac
+}
+
+validate_header_set() {
+    local name="$1"
+    local value="$2"
+    local method="$3"
+    local header_pattern='^RequestHeader[ ]+set[ ]+([A-Za-z0-9-]+)[ ]+"[-A-Za-z0-9 :/._?&=%+@#;]*"$'
+    local header_name
+
+    [[ -z "$value" ]] && return
+    if [[ "$method" != context ]]; then
+        echo "$name is only supported when PROXY_METHOD is context" >&2
+        exit 1
+    fi
+    if [[ ${#value} -gt 1024 ]] || [[ "$value" == *$'\r'* || "$value" == *$'\n'* ]] || [[ ! "$value" =~ $header_pattern ]]; then
+        echo "$name must match: RequestHeader set Header-Name \"value\"" >&2
+        exit 1
+    fi
+    header_name="${BASH_REMATCH[1],,}"
+    case "$header_name" in
+        host|content-length|transfer-encoding|connection|te|trailer|upgrade|proxy-authorization|proxy-authenticate)
+            echo "$name cannot modify the reserved $header_name header" >&2
+            exit 1
+            ;;
+    esac
+}
+
 validate_domain "$DOMAIN"
 validate_host "$BACKEND_IP"
 validate_port BACKEND_PORT "$BACKEND_PORT"
 validate_socket PROXY_SOCKET "$PROXY_SOCKET"
+PROXY_METHOD="$(normalize_proxy_method PROXY_METHOD "$PROXY_METHOD")"
+validate_header_set HEADER_SET "$HEADER_SET" "$PROXY_METHOD"
 
 if [[ "${PROXY_SOCKET,,}" == true ]]; then
     validate_host "$PROXY_SOCKET_IP"
@@ -65,6 +111,8 @@ declare -a DOMAINS=("$DOMAIN")
 declare -a BACKENDS=("$BACKEND_IP")
 declare -a BACKEND_PORTS=("$BACKEND_PORT")
 declare -a SOCKETS=("${PROXY_SOCKET,,}")
+declare -a PROXY_METHODS=("$PROXY_METHOD")
+declare -a HEADER_SETS=("$HEADER_SET")
 declare -a VH_NAMES=(Example)
 declare -A SEEN_DOMAINS
 declare -A SEEN_VH_NAMES
@@ -85,16 +133,25 @@ if [[ -f "$DOMAINS_CONFIG" ]]; then
         [[ -z "$trimmed_line" || "$trimmed_line" == \#* ]] && continue
 
         field_count="$(awk -F',' '{print NF}' <<< "$line")"
-        if [[ "$field_count" != 4 ]]; then
-            echo "$DOMAINS_CONFIG:$line_number must contain exactly 4 comma-separated fields" >&2
+        if (( field_count < 4 || field_count > 6 )); then
+            echo "$DOMAINS_CONFIG:$line_number must contain 4 to 6 comma-separated fields" >&2
             exit 1
         fi
 
-        IFS=',' read -r domain backend backend_port socket <<< "$line"
+        IFS=',' read -r domain backend backend_port socket proxy_method header_set <<< "$line"
         domain="$(trim "$domain")"
         backend="$(trim "$backend")"
         backend_port="$(trim "$backend_port")"
         socket="$(trim "$socket")"
+        proxy_method="$(trim "${proxy_method:-}")"
+        header_set="$(trim "${header_set:-}")"
+
+        if (( field_count == 4 )); then
+            proxy_method=rewrite
+        elif [[ -z "$proxy_method" ]]; then
+            echo "$DOMAINS_CONFIG:$line_number has an empty PROXY_METHOD value" >&2
+            exit 1
+        fi
 
         [[ -n "$domain" ]] || { echo "$DOMAINS_CONFIG:$line_number has an empty domain" >&2; exit 1; }
         [[ -n "$backend" ]] || { echo "$DOMAINS_CONFIG:$line_number has an empty backend host" >&2; exit 1; }
@@ -105,6 +162,8 @@ if [[ -f "$DOMAINS_CONFIG" ]]; then
         validate_host "$backend"
         validate_port "$DOMAINS_CONFIG:$line_number backend port" "$backend_port"
         validate_socket "$DOMAINS_CONFIG:$line_number PROXY_SOCKET" "$socket"
+        proxy_method="$(normalize_proxy_method "$DOMAINS_CONFIG:$line_number PROXY_METHOD" "$proxy_method")"
+        validate_header_set "$DOMAINS_CONFIG:$line_number HEADER_SET" "$header_set" "$proxy_method"
 
         domain_key="${domain,,}"
         if [[ -n "${SEEN_DOMAINS[$domain_key]+x}" ]]; then
@@ -126,6 +185,8 @@ if [[ -f "$DOMAINS_CONFIG" ]]; then
         BACKENDS+=("$backend")
         BACKEND_PORTS+=("$backend_port")
         SOCKETS+=("${socket,,}")
+        PROXY_METHODS+=("$proxy_method")
+        HEADER_SETS+=("$header_set")
         VH_NAMES+=("$vh_name")
     done < "$DOMAINS_CONFIG"
 fi
@@ -246,6 +307,8 @@ for index in "${!DOMAINS[@]}"; do
     backend="${BACKENDS[$index]}"
     backend_port="${BACKEND_PORTS[$index]}"
     socket="${SOCKETS[$index]}"
+    proxy_method="${PROXY_METHODS[$index]}"
+    header_set="${HEADER_SETS[$index]}"
     vh_name="${VH_NAMES[$index]}"
     if [[ "$index" == 0 ]]; then
         proxy_name=proxy_backend
@@ -289,6 +352,11 @@ extprocessor $proxy_name {
     respBuffer              0
 }
 
+EOF
+
+    if [[ "$proxy_method" == rewrite ]]; then
+        cat >> "$vhost_conf" <<EOF
+
 rewrite  {
     enable                  1
     autoLoadHtaccess        0
@@ -297,6 +365,26 @@ rewrite  {
     RewriteRule             ^(.*)$ HTTP://$proxy_name/\$1 [P,L,E=PROXY-HOST:${domain}]
 }
 EOF
+    else
+        cat >> "$vhost_conf" <<EOF
+
+context /.well-known/acme-challenge/ {
+    type                    static
+    location                $vhost_root/html/.well-known/acme-challenge/
+    allowBrowse             0
+}
+
+context / {
+    type                    proxy
+    handler                 $proxy_name
+EOF
+        if [[ -n "$header_set" ]]; then
+            printf '    extraHeaders            %s\n' "$header_set" >> "$vhost_conf"
+        fi
+        cat >> "$vhost_conf" <<EOF
+}
+EOF
+    fi
 
     if [[ "$socket" == true ]]; then
         socket_ip="$backend"

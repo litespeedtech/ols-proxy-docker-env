@@ -28,13 +28,28 @@ jobs:
             -e 's/^DOMAIN=.*/DOMAIN=test.example.test/' \
             -e 's/^ACME_EMAIL=.*/ACME_EMAIL=/' \
             -e 's/^PROXY_SOCKET=.*/PROXY_SOCKET=false/' \
+            -e 's/^PROXY_METHOD=.*/PROXY_METHOD=rewrite/' \
             .env
+          printf '%s\n' \
+            'context.example.test, test-backend, 8080, false, context, RequestHeader set Origin "https://www.example.com"' \
+            > domains.conf
 
       - name: Validate Compose configuration
         run: docker compose config
 
       - name: Build the OLS proxy image
         run: docker compose build ols-proxy
+
+      - name: Reject unsafe header configuration
+        run: |
+          if output=$(docker compose run --rm --no-deps \
+            -e PROXY_METHOD=context \
+            -e 'HEADER_SET=RequestHeader set Origin "https://example.com"} context / {' \
+            ols-proxy 2>&1); then
+            echo 'Unsafe HEADER_SET was accepted' >&2
+            exit 1
+          fi
+          grep -Fq 'HEADER_SET must match' <<< "$output"
 
       - name: Create the OLS proxy container
         run: docker compose create ols-proxy
@@ -74,11 +89,24 @@ jobs:
             -H 'Host: test.example.test' \
             http://127.0.0.1/
 
+      - name: Verify proxy-context routing through port 80
+        run: |
+          curl --fail --show-error \
+            --retry 30 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --retry-all-errors \
+            -H 'Host: context.example.test' \
+            http://127.0.0.1/
+
       - name: Verify generated OLS configuration
         run: |
           docker compose exec -T ols-proxy grep -Fq 'test.example.test' /usr/local/lsws/conf/httpd_config.conf
           docker compose exec -T ols-proxy grep -Fq 'test-backend' /usr/local/lsws/conf/vhosts/Example/vhconf.conf
           docker compose exec -T ols-proxy grep -Fq 'proxy_backend' /usr/local/lsws/conf/vhosts/Example/vhconf.conf
+          docker compose exec -T ols-proxy grep -Fq 'context / {' /usr/local/lsws/conf/vhosts/VH_context_example_test/vhconf.conf
+          docker compose exec -T ols-proxy grep -Fq 'handler                 proxy_backend2' /usr/local/lsws/conf/vhosts/VH_context_example_test/vhconf.conf
+          docker compose exec -T ols-proxy grep -Fq 'extraHeaders            RequestHeader set Origin "https://www.example.com"' /usr/local/lsws/conf/vhosts/VH_context_example_test/vhconf.conf
 
       - name: Show container logs on failure
         if: failure()
