@@ -1,0 +1,30 @@
+services:
+  ols-proxy:
+    build:
+      context: .
+      args:
+        OLS_IMAGE: ${OLS_IMAGE:-litespeedtech/openlitespeed:latest}
+    env_file:
+      - .env
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      #- "7080:7080"
+    volumes:
+      - lsws_data:/usr/local/lsws
+      - ./domains.conf:/etc/ols-proxy/domains.conf:ro
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - ls-net
+
+volumes:
+  lsws_data:
+
+networks:
+  ls-net:
+    name: ls-net

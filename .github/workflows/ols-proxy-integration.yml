@@ -1,0 +1,93 @@
+name: OpenLiteSpeed integration test
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'README.md'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+
+jobs:
+  reverse-proxy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure test environment
+        shell: bash
+        run: |
+          cp .env.example .env
+          sed -i \
+            -e 's/^BACKEND_IP=.*/BACKEND_IP=test-backend/' \
+            -e 's/^BACKEND_PORT=.*/BACKEND_PORT=8080/' \
+            -e 's/^DOMAIN=.*/DOMAIN=test.example.test/' \
+            -e 's/^ACME_EMAIL=.*/ACME_EMAIL=/' \
+            -e 's/^PROXY_SOCKET=.*/PROXY_SOCKET=false/' \
+            .env
+
+      - name: Validate Compose configuration
+        run: docker compose config
+
+      - name: Build the OLS proxy image
+        run: docker compose build ols-proxy
+
+      - name: Create the OLS proxy container
+        run: docker compose create ols-proxy
+
+      - name: Start a lightweight backend on the shared network
+        run: |
+          docker run -d \
+            --name test-backend \
+            --network ls-net \
+            busybox:1.36 \
+            sh -c 'mkdir -p /www && printf "backend-ok\n" > /www/index.html && httpd -f -p 8080 -h /www'
+
+      - name: Start OpenLiteSpeed
+        run: docker compose start ols-proxy
+
+      - name: Wait for OpenLiteSpeed
+        run: |
+          for attempt in {1..60}; do
+            if docker compose exec -T ols-proxy /usr/local/lsws/bin/lswsctrl status 2>/dev/null | grep -q 'litespeed is running with PID'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs ols-proxy
+          exit 1
+
+      - name: Verify HTTP reverse proxy through port 80
+        run: |
+          curl --fail --show-error \
+            --include \
+            --verbose \
+            --retry 30 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --retry-all-errors \
+            --write-out '\nHTTP_STATUS=%{http_code}\nREMOTE_IP=%{remote_ip}\nHTTP_VERSION=%{http_version}\nCONNECT=%{time_connect}s\nTOTAL=%{time_total}s\n' \
+            -H 'Host: test.example.test' \
+            http://127.0.0.1/
+
+      - name: Verify generated OLS configuration
+        run: |
+          docker compose exec -T ols-proxy grep -Fq 'test.example.test' /usr/local/lsws/conf/httpd_config.conf
+          docker compose exec -T ols-proxy grep -Fq 'test-backend' /usr/local/lsws/conf/vhosts/Example/vhconf.conf
+          docker compose exec -T ols-proxy grep -Fq 'proxy_backend' /usr/local/lsws/conf/vhosts/Example/vhconf.conf
+
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          docker compose logs ols-proxy
+          docker logs test-backend || true
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f test-backend 2>/dev/null || true
+          docker compose down -v
