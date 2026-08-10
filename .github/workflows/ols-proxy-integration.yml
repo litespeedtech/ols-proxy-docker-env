@@ -1,4 +1,4 @@
-name: OpenLiteSpeed integration test
+name: proxy-test
 
 on:
   pull_request:

@@ -1,8 +1,6 @@
 # OpenLiteSpeed Docker Reverse Proxy
 
-![ols-proxy-docker-env](https://socialify.git.ci/litespeedtech/ols-proxy-docker-env/image?description=1&font=Inter&forks=1&issues=1&language=1&logo=https%3A%2F%2Fwww.litespeedtech.com%2Fimages%2Flogos%2Flitespeed%2Flitespeed-logo-square.svg&name=1&owner=1&pattern=Plus&pulls=1&stargazers=1&theme=Auto&utm_source=chatgpt.com)
-
-[![Build Status](https://github.com/litespeedtech/ols-proxy-docker-env/workflows/docker-build/badge.svg)](https://github.com/litespeedtech/ols-proxy-docker-env/actions/)
+[![Build Status](https://github.com/litespeedtech/ols-proxy-docker-env/workflows/proxy-test/badge.svg)](https://github.com/litespeedtech/ols-proxy-docker-env/actions/)
 [![docker pulls](https://img.shields.io/docker/pulls/litespeedtech/openlitespeed?style=flat&color=blue)](https://hub.docker.com/r/litespeedtech/openlitespeed)
 [![LiteSpeed on Slack](https://img.shields.io/badge/slack-LiteSpeed-blue.svg?logo=slack)](https://litespeedtech.com/slack)
 [![Follow on Twitter](https://img.shields.io/twitter/follow/litespeedtech.svg?label=Follow&style=social)](https://twitter.com/litespeedtech)
