@@ -12,7 +12,7 @@ The configuration includes:
 - A per-VH OLS proxy External App (`proxy_backend`, `proxy_backend2`, and so on).
 - A RewriteRule that proxies all requests to the backend.
 - HTTP and HTTPS listeners on ports `80` and `443`, including UDP `443` for HTTP/3 QUIC.
-- OpenLiteSpeed native ACME certificate management.
+- OpenLiteSpeed ACME certificate management (domain must point to this server).
 
 ## Configuration
 
@@ -117,7 +117,7 @@ The primary `.env` domain remains the `Example` virtual host. Each line in `doma
 The file is mounted read-only into the container, so changing `domains.conf` does not require an image rebuild. Restart the proxy after changes:
 
 ```sh
-docker compose up -d
+docker compose restart ols-proxy
 ```
 
 ### How to visit WebAdmin
