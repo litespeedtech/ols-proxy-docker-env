@@ -371,7 +371,7 @@ EOF
 context /.well-known/acme-challenge/ {
     type                    static
     location                $vhost_root/html/.well-known/acme-challenge/
-    allowBrowse             0
+    allowBrowse             1
 }
 
 context / {
