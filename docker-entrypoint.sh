@@ -263,6 +263,7 @@ indexFiles              index.html
 
 errorlog $SERVER_ROOT/logs/$vh_name.error.log {
     useServer             0
+    logLevel              ERROR
 }
 
 accesslog $SERVER_ROOT/logs/$vh_name.access.log {
