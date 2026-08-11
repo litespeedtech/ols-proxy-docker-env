@@ -32,6 +32,7 @@ jobs:
             .env
           printf '%s\n' \
             'context.example.test, test-backend, 8080, false, context, RequestHeader set Origin "https://www.example.com"' \
+            'headers.example.test, test-backend, 8080, false, context, append Cache-Control "no-store"' \
             > domains.conf
 
       - name: Validate Compose configuration
@@ -49,7 +50,7 @@ jobs:
             echo 'Unsafe HEADER_SET was accepted' >&2
             exit 1
           fi
-          grep -Fq 'HEADER_SET must match' <<< "$output"
+          grep -Fq 'HEADER_SET must contain one valid Header or RequestHeader operation' <<< "$output"
 
       - name: Create the OLS proxy container
         run: docker compose create ols-proxy
@@ -107,6 +108,8 @@ jobs:
           docker compose exec -T ols-proxy grep -Fq 'context / {' /usr/local/lsws/conf/vhosts/VH_context_example_test/vhconf.conf
           docker compose exec -T ols-proxy grep -Fq 'handler                 proxy_backend2' /usr/local/lsws/conf/vhosts/VH_context_example_test/vhconf.conf
           docker compose exec -T ols-proxy grep -Fq 'extraHeaders            RequestHeader set Origin "https://www.example.com"' /usr/local/lsws/conf/vhosts/VH_context_example_test/vhconf.conf
+          docker compose exec -T ols-proxy grep -Fq 'handler                 proxy_backend3' /usr/local/lsws/conf/vhosts/VH_headers_example_test/vhconf.conf
+          docker compose exec -T ols-proxy grep -Fq 'extraHeaders            Header append Cache-Control "no-store"' /usr/local/lsws/conf/vhosts/VH_headers_example_test/vhconf.conf
 
       - name: Show container logs on failure
         if: failure()

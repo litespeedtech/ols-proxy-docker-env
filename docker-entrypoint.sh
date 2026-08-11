@@ -70,11 +70,13 @@ normalize_proxy_method() {
     esac
 }
 
-validate_header_set() {
+normalize_header_operation() {
     local name="$1"
     local value="$2"
     local method="$3"
-    local header_pattern='^RequestHeader[ ]+set[ ]+([A-Za-z0-9-]+)[ ]+"[-A-Za-z0-9 :/._?&=%+@#;]*"$'
+    local mutating_pattern="^(Header|RequestHeader) (set|append|merge|add) ([A-Za-z0-9-]+) (\"[-A-Za-z0-9 :/._?&=%+@#;,()'!*|~]*\"|[-A-Za-z0-9:/._?&=%+@#;()'!*|~]+)$"
+    local unset_pattern='^(Header|RequestHeader) unset ([A-Za-z0-9-]+)$'
+    local normalized
     local header_name
 
     [[ -z "$value" ]] && return
@@ -82,17 +84,43 @@ validate_header_set() {
         echo "$name is only supported when PROXY_METHOD is context" >&2
         exit 1
     fi
-    if [[ ${#value} -gt 1024 ]] || [[ "$value" == *$'\r'* || "$value" == *$'\n'* ]] || [[ ! "$value" =~ $header_pattern ]]; then
-        echo "$name must match: RequestHeader set Header-Name \"value\"" >&2
+
+    if [[ ${#value} -gt 1024 ]] || [[ "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+        echo "$name contains an unsupported character or is longer than 1024 characters" >&2
         exit 1
     fi
-    header_name="${BASH_REMATCH[1],,}"
+
+    if [[ "$value" == NONE ]]; then
+        printf '%s' NONE
+        return
+    fi
+
+    case "$value" in
+        Header\ *|RequestHeader\ *)
+            normalized="$value"
+            ;;
+        *)
+            normalized="Header $value"
+            ;;
+    esac
+
+    if [[ "$normalized" =~ $mutating_pattern ]]; then
+        header_name="${BASH_REMATCH[3],,}"
+    elif [[ "$normalized" =~ $unset_pattern ]]; then
+        header_name="${BASH_REMATCH[2],,}"
+    else
+        echo "$name must contain one valid Header or RequestHeader operation" >&2
+        exit 1
+    fi
+
     case "$header_name" in
         host|content-length|transfer-encoding|connection|te|trailer|upgrade|proxy-authorization|proxy-authenticate)
             echo "$name cannot modify the reserved $header_name header" >&2
             exit 1
             ;;
     esac
+
+    printf '%s' "$normalized"
 }
 
 validate_domain "$DOMAIN"
@@ -100,7 +128,7 @@ validate_host "$BACKEND_IP"
 validate_port BACKEND_PORT "$BACKEND_PORT"
 validate_socket PROXY_SOCKET "$PROXY_SOCKET"
 PROXY_METHOD="$(normalize_proxy_method PROXY_METHOD "$PROXY_METHOD")"
-validate_header_set HEADER_SET "$HEADER_SET" "$PROXY_METHOD"
+HEADER_SET="$(normalize_header_operation HEADER_SET "$HEADER_SET" "$PROXY_METHOD")"
 
 if [[ "${PROXY_SOCKET,,}" == true ]]; then
     validate_host "$PROXY_SOCKET_IP"
@@ -163,7 +191,7 @@ if [[ -f "$DOMAINS_CONFIG" ]]; then
         validate_port "$DOMAINS_CONFIG:$line_number backend port" "$backend_port"
         validate_socket "$DOMAINS_CONFIG:$line_number PROXY_SOCKET" "$socket"
         proxy_method="$(normalize_proxy_method "$DOMAINS_CONFIG:$line_number PROXY_METHOD" "$proxy_method")"
-        validate_header_set "$DOMAINS_CONFIG:$line_number HEADER_SET" "$header_set" "$proxy_method"
+        header_set="$(normalize_header_operation "$DOMAINS_CONFIG:$line_number HEADER_SET" "$header_set" "$proxy_method")"
 
         domain_key="${domain,,}"
         if [[ -n "${SEEN_DOMAINS[$domain_key]+x}" ]]; then

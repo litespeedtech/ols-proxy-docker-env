@@ -37,8 +37,6 @@ DOMAIN=www.example.com
 ACME_EMAIL=
 PROXY_SOCKET=false
 PROXY_METHOD=rewrite
-### HEADER_SET works with Context mode only ###
-# HEADER_SET=RequestHeader set Origin "https://www.example.com"
 ```
 
 `DOMAIN` is used for the OLS listener mapping and is sent to the backend as the `Host` header.
@@ -49,14 +47,22 @@ Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By defaul
 
 `PROXY_METHOD=R` or `PROXY_METHOD=rewrite` uses the default RewriteRule proxy. `PROXY_METHOD=C` or `PROXY_METHOD=context` uses an OpenLiteSpeed proxy context. Values are case-insensitive.
 
-Context mode optionally accepts one request-header directive through `HEADER_SET`, for example:
+Context mode optionally accepts one OLS header operation through `HEADER_SET`, for example:
 
 ```dotenv
 PROXY_METHOD=context
-HEADER_SET=RequestHeader set Origin "https://www.example.com"
+HEADER_SET=RequestHeader set Origin "https://${DOMAIN}"
 ```
 
-For safety, `HEADER_SET` must exactly match `RequestHeader set Header-Name "value"`. Newlines, backslashes, braces, extra quotes, unsupported characters, values longer than 1024 characters, and transport-sensitive headers such as `Host`, `Content-Length`, and `Transfer-Encoding` are rejected.
+Supported syntax:
+
+```text
+<Header|RequestHeader> <set|append|merge|add|unset> <header-name> ["value"]
+```
+
+The `Header` keyword may be omitted for response-header operations. `NONE` disables inherited header operations. Exactly one operation is accepted per `HEADER_SET`; `set`, `append`, `merge`, and `add` require a value, while `unset` does not accept one.
+
+For safety, newlines, backslashes, braces, extra double quotes, unsupported characters, values longer than 1024 characters, and transport-sensitive headers such as `Host`, `Content-Length`, and `Transfer-Encoding` are rejected.
 
 ## Connect another Docker stack
 
