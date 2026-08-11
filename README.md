@@ -16,6 +16,13 @@ The configuration includes:
 
 ## Configuration
 
+Clone the project and enter its directory:
+
+```sh
+git clone https://github.com/litespeedtech/ols-proxy-docker-env.git
+cd ols-proxy-docker-env
+```
+
 Copy the example environment file and edit the values:
 
 ```sh
