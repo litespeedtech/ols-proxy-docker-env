@@ -30,7 +30,7 @@ DOMAIN=www.example.com
 ACME_EMAIL=
 PROXY_SOCKET=false
 PROXY_METHOD=rewrite
-# Context mode only:
+### HEADER_SET works with Context mode only ###
 # HEADER_SET=RequestHeader set Origin "https://www.example.com"
 ```
 
@@ -66,7 +66,6 @@ services:
 networks:
   ls-net:
     external: true
-    name: ls-net
 ```
 
 Then use the backend service name and its internal container port in `.env`:
