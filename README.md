@@ -130,20 +130,24 @@ docker compose up -d --build
 
 ### How to add additional domains
 
-The `.env` configuration always defines the primary single-domain proxy and remains backward compatible. If additional domains are required, add one valid entry per line to `domains.conf`:
+Keep the primary domain in `.env`. Add each additional domain on a new line in `domains.conf`.
+
+Context method example:
 
 ```text
 DOMAIN, BACKEND_IP, BACKEND_PORT, PROXY_SOCKET, PROXY_METHOD, HEADER_SET
 second.example.com, backend-service, 8080, false, context, RequestHeader set Origin "https://www.example.com"
 ```
 
-The primary `.env` domain remains the `Example` virtual host. Each line in `domains.conf` creates an additional virtual host named from the domain, an independent proxy External App, an HTTP/HTTPS listener mapping, and its own ACME-enabled VHost configuration. The primary VHost uses `proxy_backend`; additional VHosts use `proxy_backend2`, `proxy_backend3`, and so on. Do not add `OLS_IMAGE` or `ACME_EMAIL` to `domains.conf`; those settings remain global in `.env`.
+Rewrite method example:
 
-`PROXY_METHOD` and `HEADER_SET` are optional for backward compatibility: an existing four-field line defaults to RewriteRule mode. A five-field line selects the proxy method, and a six-field line may add one validated header in Context mode. Because fields are comma-separated, `HEADER_SET` cannot contain a comma.
+```text
+third.example.com, another-backend, 3000, false, rewrite
+```
 
-`PROXY_SOCKET` must be exactly `true` or `false`. When it is `true`, the WebSocket backend uses the same host and port from that line. The parser rejects missing fields, invalid domains, invalid backend hosts, invalid ports, invalid Boolean values, invalid proxy methods or headers, duplicate domains, and extra comma-separated fields.
+Use `PROXY_SOCKET=true` only when the backend needs WebSocket support. `HEADER_SET` is optional and works only with the `context` method.
 
-The file is mounted read-only into the container, so changing `domains.conf` does not require an image rebuild. Restart the proxy after changes:
+Restart the proxy after editing the file:
 
 ```sh
 docker compose restart ols-proxy
