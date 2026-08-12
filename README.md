@@ -9,7 +9,7 @@ This project runs the official `litespeedtech/openlitespeed` image as a Dockeriz
 
 The configuration includes:
 
-- A per-VH OLS proxy External App (`proxy_backend`, `proxy_backend2`, and so on).
+- A per-VH OLS proxy External App
 - Selectable RewriteRule or proxy-context routing to the backend.
 - HTTP and HTTPS listeners on ports `80` and `443`, including UDP `443` for HTTP/3 QUIC.
 - OpenLiteSpeed ACME certificate management (domain must point to this server).
@@ -54,7 +54,7 @@ Context mode optionally accepts one OLS header operation through `HEADER_SET`, f
 
 ```dotenv
 PROXY_METHOD=context
-HEADER_SET=RequestHeader set Origin "https://${DOMAIN}"
+HEADER_SET=X-XSS-Protection 1;mode=block
 ```
 
 Supported syntax:
