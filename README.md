@@ -35,8 +35,9 @@ BACKEND_IP=192.168.0.1
 BACKEND_PORT=1234
 DOMAIN=www.example.com
 ACME_EMAIL=
+PROXY_METHOD=context
 PROXY_SOCKET=false
-PROXY_METHOD=rewrite
+HEADER_SET=
 ```
 
 `DOMAIN` is used for the OLS listener mapping and is sent to the backend as the `Host` header.
@@ -46,7 +47,8 @@ Use the backend container port in that case; for example, `backend-service:8080`
 
 Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By default, it reuses `BACKEND_IP` and `BACKEND_PORT`, which is the usual setup when HTTP and WebSocket traffic belong to the same application. Set `PROXY_SOCKET_IP` and `PROXY_SOCKET_PORT` only when the WebSocket service uses a different backend.
 
-`PROXY_METHOD=rewrite` uses the default RewriteRule proxy. `PROXY_METHOD=context` uses an OpenLiteSpeed proxy context. Values are case-insensitive.
+`PROXY_METHOD=context` uses an OpenLiteSpeed proxy context.
+`PROXY_METHOD=rewrite` uses the default RewriteRule proxy. 
 
 Context mode optionally accepts one OLS header operation through `HEADER_SET`, for example:
 
@@ -60,6 +62,8 @@ Supported syntax:
 ```text
 <Header|RequestHeader> <set|append|merge|add|unset> <header-name> ["value"]
 ```
+
+For a response header, `Header set` may be omitted. For example, `X-XSS-Protection 1;mode=block` is treated as `Header set X-XSS-Protection 1;mode=block`. A colon after the header name is optional. 
 
 ## Connect another Docker stack
 
@@ -133,7 +137,7 @@ Context method example:
 
 ```text
 DOMAIN, BACKEND_IP, BACKEND_PORT, PROXY_SOCKET, PROXY_METHOD, HEADER_SET
-second.example.com, backend-service, 8080, false, context, RequestHeader set Origin "https://www.example.com"
+second.example.com, backend-service, 8080, false, context, Strict-Transport-Security: max-age=31536000; includeSubDomains
 ```
 
 Rewrite method example:
@@ -142,7 +146,7 @@ Rewrite method example:
 third.example.com, another-backend, 3000, false, rewrite
 ```
 
-Use `PROXY_SOCKET=true` only when the backend needs WebSocket support. `HEADER_SET` is optional and works only with the `context` method.
+Use `PROXY_SOCKET=true` only when the backend needs WebSocket support. `HEADER_SET` is optional and works only with the `context` method. With `rewrite`, it is ignored and a warning is written to the container log.
 
 Restart the proxy after editing the file:
 

@@ -74,15 +74,22 @@ normalize_header_operation() {
     local name="$1"
     local value="$2"
     local method="$3"
-    local mutating_pattern="^(Header|RequestHeader) (set|append|merge|add) ([A-Za-z0-9-]+) (\"[-A-Za-z0-9 :/._?&=%+@#;,()'!*|~]*\"|[-A-Za-z0-9:/._?&=%+@#;()'!*|~]+)$"
-    local unset_pattern='^(Header|RequestHeader) unset ([A-Za-z0-9-]+)$'
+    local safe_unquoted_value="^[-A-Za-z0-9 :/._?&=%+@#;,()'!*|~]+$"
+    local safe_quoted_value="^\"[-A-Za-z0-9 :/._?&=%+@#;,()'!*|~]*\"$"
+    local directive
+    local operation
+    local arguments
+    local first
+    local second
+    local remainder
     local normalized
     local header_name
+    local header_value
 
     [[ -z "$value" ]] && return
     if [[ "$method" != context ]]; then
-        echo "$name is only supported when PROXY_METHOD is context" >&2
-        exit 1
+        echo "WARNING: $name is ignored because PROXY_METHOD is $method; header operations require context" >&2
+        return
     fi
 
     if [[ ${#value} -gt 1024 ]] || [[ "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
@@ -95,23 +102,57 @@ normalize_header_operation() {
         return
     fi
 
-    case "$value" in
-        Header\ *|RequestHeader\ *)
-            normalized="$value"
+    read -r first second remainder <<< "$value"
+    case "${first,,}" in
+        header|requestheader)
+            [[ "${first,,}" == requestheader ]] && directive=RequestHeader || directive=Header
+            operation="${second,,}"
+            arguments="$(trim "$remainder")"
+            ;;
+        set|append|merge|add|unset)
+            directive=Header
+            operation="${first,,}"
+            arguments="$(trim "$second $remainder")"
             ;;
         *)
-            normalized="Header $value"
+            directive=Header
+            operation=set
+            arguments="$value"
             ;;
     esac
 
-    if [[ "$normalized" =~ $mutating_pattern ]]; then
-        header_name="${BASH_REMATCH[3],,}"
-    elif [[ "$normalized" =~ $unset_pattern ]]; then
-        header_name="${BASH_REMATCH[2],,}"
-    else
+    case "$operation" in
+        unset)
+            read -r header_name remainder <<< "$arguments"
+            if [[ -z "$header_name" || -n "$remainder" ]]; then
+                echo "$name must contain one valid Header or RequestHeader operation" >&2
+                exit 1
+            fi
+            ;;
+        set|append|merge|add)
+            read -r header_name header_value <<< "$arguments"
+            header_value="$(trim "$header_value")"
+            if [[ -z "$header_name" || -z "$header_value" ]] ||
+               ! [[ "$header_value" =~ $safe_unquoted_value || "$header_value" =~ $safe_quoted_value ]]; then
+                echo "$name must contain one valid Header or RequestHeader operation" >&2
+                exit 1
+            fi
+            ;;
+        *)
+            echo "$name must contain one valid Header or RequestHeader operation" >&2
+            exit 1
+            ;;
+    esac
+
+    header_name="${header_name%:}"
+    if ! [[ "$header_name" =~ ^[A-Za-z0-9-]+$ ]]; then
         echo "$name must contain one valid Header or RequestHeader operation" >&2
         exit 1
     fi
+
+    normalized="$directive $operation $header_name"
+    [[ "$operation" != unset ]] && normalized+=" $header_value"
+    header_name="${header_name,,}"
 
     case "$header_name" in
         host|content-length|transfer-encoding|connection|te|trailer|upgrade|proxy-authorization|proxy-authenticate)
@@ -161,8 +202,8 @@ if [[ -f "$DOMAINS_CONFIG" ]]; then
         [[ -z "$trimmed_line" || "$trimmed_line" == \#* ]] && continue
 
         field_count="$(awk -F',' '{print NF}' <<< "$line")"
-        if (( field_count < 4 || field_count > 6 )); then
-            echo "$DOMAINS_CONFIG:$line_number must contain 4 to 6 comma-separated fields" >&2
+        if (( field_count < 4 )); then
+            echo "$DOMAINS_CONFIG:$line_number must contain at least 4 comma-separated fields" >&2
             exit 1
         fi
 
