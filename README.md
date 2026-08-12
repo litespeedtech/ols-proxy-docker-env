@@ -41,11 +41,12 @@ PROXY_METHOD=rewrite
 
 `DOMAIN` is used for the OLS listener mapping and is sent to the backend as the `Host` header.
 
-`BACKEND_IP` is the backend host, not necessarily a numeric IP address. It may be an IP address, DNS hostname, or Docker service/container name such as `backend-service` when both containers share a Docker network. Use the backend container port in that case; for example, `backend-service:8080`, not the host-published port from a `host-port:container-port` mapping.
+`BACKEND_IP` is the backend host, not necessarily a numeric IP address. It may be an IP address, DNS hostname, or Docker service/container name such as `backend-service` when both containers share a Docker network. 
+Use the backend container port in that case; for example, `backend-service:8080`, not the host-published port from a `host-port:container-port` mapping.
 
 Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By default, it reuses `BACKEND_IP` and `BACKEND_PORT`, which is the usual setup when HTTP and WebSocket traffic belong to the same application. Set `PROXY_SOCKET_IP` and `PROXY_SOCKET_PORT` only when the WebSocket service uses a different backend.
 
-`PROXY_METHOD=R` or `PROXY_METHOD=rewrite` uses the default RewriteRule proxy. `PROXY_METHOD=C` or `PROXY_METHOD=context` uses an OpenLiteSpeed proxy context. Values are case-insensitive.
+`PROXY_METHOD=rewrite` uses the default RewriteRule proxy. `PROXY_METHOD=context` uses an OpenLiteSpeed proxy context. Values are case-insensitive.
 
 Context mode optionally accepts one OLS header operation through `HEADER_SET`, for example:
 
@@ -59,10 +60,6 @@ Supported syntax:
 ```text
 <Header|RequestHeader> <set|append|merge|add|unset> <header-name> ["value"]
 ```
-
-The `Header` keyword may be omitted for response-header operations. `NONE` disables inherited header operations. Exactly one operation is accepted per `HEADER_SET`; `set`, `append`, `merge`, and `add` require a value, while `unset` does not accept one.
-
-For safety, newlines, backslashes, braces, extra double quotes, unsupported characters, values longer than 1024 characters, and transport-sensitive headers such as `Host`, `Content-Length`, and `Transfer-Encoding` are rejected.
 
 ## Connect another Docker stack
 
