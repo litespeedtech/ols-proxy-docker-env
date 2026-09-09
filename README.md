@@ -72,13 +72,9 @@ Compose creates a shared bridge network named `ls-net`. Any backend container th
 For a backend in another Compose project, add the external network to that project's `docker-compose.yml`:
 
 ```yaml
-services:
-  backend:
-    networks:
-      - ls-net
-
 networks:
-  ls-net:
+  default:
+    name: ls-net
     external: true
 ```
 
@@ -167,3 +163,14 @@ Set or reset the WebAdmin password interactively:
 ```sh
 docker compose exec ols-proxy /usr/local/lsws/admin/misc/admpass.sh
 ```
+
+
+## Support & Feedback
+
+If you still have a question after using OpenLiteSpeed Docker, you have a few options.
+
+* Join [the GoLiteSpeed Slack community](https://litespeedtech.com/slack) for real-time discussion
+* Post to [the OpenLiteSpeed Forums](https://forum.openlitespeed.org/) for community support
+* Reporting any issue on [Github ols-proxy-docker-env](https://github.com/litespeedtech/ols-proxy-docker-env/issues) project
+
+**_Pull requests are always welcome!_**
