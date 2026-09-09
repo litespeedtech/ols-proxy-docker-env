@@ -123,6 +123,19 @@ Changing `domains.conf` only requires restarting the container. Changing `Docker
 docker compose up -d --build
 ```
 
+## Application Examples
+
+The OpenLiteSpeed Docker Proxy supports a wide range of Docker-based applications. The following are some examples with application-specific configuration guides:
+
+| Application | Documentation |
+| --- | --- |
+| **n8n** | [n8n + OpenLiteSpeed](https://docs.openlitespeed.org/apps/n8n/) |
+| **Uptime Kuma** | [Uptime Kuma + OpenLiteSpeed](https://docs.openlitespeed.org/apps/uptimekuma/) |
+| **AnythingLLM** | [AnythingLLM + OpenLiteSpeed](https://docs.openlitespeed.org/apps/anythingllm/) |
+| **LibreChat** | [LibreChat + OpenLiteSpeed](https://docs.openlitespeed.org/apps/librechat/) |
+| **Open WebUI** | [Open WebUI + OpenLiteSpeed](https://docs.openlitespeed.org/apps/openwebui/) |
+| **Langflow** | [Langflow + OpenLiteSpeed](https://docs.openlitespeed.org/apps/langflow/) |
+
 ## FAQ
 
 ### How to add additional domains
