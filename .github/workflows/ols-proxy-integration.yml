@@ -22,7 +22,6 @@ jobs:
         shell: bash
         run: |
           cp .env.example .env
-          cp .security.conf.example .security.conf
           sed -i \
             -e 's/^BACKEND_IP=.*/BACKEND_IP=test-backend/' \
             -e 's/^BACKEND_PORT=.*/BACKEND_PORT=8080/' \

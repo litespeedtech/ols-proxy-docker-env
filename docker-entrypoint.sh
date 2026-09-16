@@ -14,8 +14,6 @@ THROTTLING="${THROTTLING:-false}"
 RECAPTCHA="${RECAPTCHA:-false}"
 MODSECURITY="${MODSECURITY:-false}"
 DOMAINS_CONFIG=/etc/ols-proxy/domains.conf
-SECURITY_SETTINGS_FILE=/etc/ols-proxy/security.conf
-declare -A SECURITY_VALUES
 
 trim() {
     local value="$1"
@@ -101,65 +99,6 @@ validate_recaptcha_key() {
     fi
 }
 
-load_security_settings() {
-    local line line_number=0 trimmed_line key value
-    if [[ ! -f "$SECURITY_SETTINGS_FILE" ]]; then
-        echo "$SECURITY_SETTINGS_FILE must be a regular file" >&2
-        exit 1
-    fi
-
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        line_number=$((line_number + 1))
-        line="${line%$'\r'}"
-        trimmed_line="$(trim "$line")"
-        [[ -z "$trimmed_line" || "$trimmed_line" == \#* ]] && continue
-        if [[ "$trimmed_line" != *=* ]]; then
-            echo "$SECURITY_SETTINGS_FILE:$line_number must use KEY=VALUE syntax" >&2
-            exit 1
-        fi
-        key="$(trim "${trimmed_line%%=*}")"
-        value="$(trim "${trimmed_line#*=}")"
-        case "$key" in
-            THROTTLING_STATIC_REQ_PER_SEC|THROTTLING_DYNAMIC_REQ_PER_SEC|THROTTLING_OUT_BANDWIDTH|THROTTLING_IN_BANDWIDTH|THROTTLING_SOFT_LIMIT|THROTTLING_HARD_LIMIT|THROTTLING_BLOCK_BAD_REQUEST|THROTTLING_GRACE_PERIOD|THROTTLING_BAN_PERIOD|RECAPTCHA_TYPE|RECAPTCHA_SITE_KEY|RECAPTCHA_SECRET_KEY|RECAPTCHA_MAX_TRIES|RECAPTCHA_ALLOWED_ROBOT_HITS|RECAPTCHA_CONNECTION_LIMIT|RECAPTCHA_SSL_CONNECTION_LIMIT)
-                ;;
-            *)
-                echo "$SECURITY_SETTINGS_FILE:$line_number has an unsupported setting: $key" >&2
-                exit 1
-                ;;
-        esac
-        if [[ -n "${SECURITY_VALUES[$key]+x}" ]]; then
-            echo "$SECURITY_SETTINGS_FILE:$line_number has a duplicate setting: $key" >&2
-            exit 1
-        fi
-        if [[ -z "$value" && "$key" != RECAPTCHA_SITE_KEY && "$key" != RECAPTCHA_SECRET_KEY ]]; then
-            echo "$SECURITY_SETTINGS_FILE:$line_number has an empty setting: $key" >&2
-            exit 1
-        fi
-        SECURITY_VALUES["$key"]="$value"
-    done < "$SECURITY_SETTINGS_FILE"
-}
-
-security_value() {
-    local name="$1"
-    local default_value="$2"
-    printf '%s' "${SECURITY_VALUES[$name]:-$default_value}"
-}
-
-resolve_security_settings_file() {
-    if [[ -f "$SECURITY_SETTINGS_FILE" ]]; then
-        return
-    fi
-
-    if [[ "${THROTTLING,,}" == true || "${RECAPTCHA,,}" == true || "${MODSECURITY,,}" == true ]]; then
-        echo "$SECURITY_SETTINGS_FILE is required when a global security feature is enabled; copy .security.conf.example to .security.conf" >&2
-        exit 1
-    fi
-
-    SECURITY_SETTINGS_FILE=/opt/ols-proxy/security.conf.default
-    [[ -f "$SECURITY_SETTINGS_FILE" ]] || { echo "Default security configuration is missing from the image" >&2; exit 1; }
-    echo "WARNING: .security.conf is not present; using the image's safe security defaults" >&2
-}
-
 write_security_config() {
     local config_file="$1"
     local throttling_static throttling_dynamic throttling_out throttling_in
@@ -167,15 +106,15 @@ write_security_config() {
     local recaptcha_type recaptcha_site_key recaptcha_secret_key recaptcha_max_tries
     local recaptcha_robot_hits recaptcha_connection_limit recaptcha_ssl_connection_limit
 
-    throttling_static="$(security_value THROTTLING_STATIC_REQ_PER_SEC 40)"
-    throttling_dynamic="$(security_value THROTTLING_DYNAMIC_REQ_PER_SEC 20)"
-    throttling_out="$(security_value THROTTLING_OUT_BANDWIDTH 0)"
-    throttling_in="$(security_value THROTTLING_IN_BANDWIDTH 0)"
-    throttling_soft="$(security_value THROTTLING_SOFT_LIMIT 15)"
-    throttling_hard="$(security_value THROTTLING_HARD_LIMIT 20)"
-    throttling_grace="$(security_value THROTTLING_GRACE_PERIOD 15)"
-    throttling_ban="$(security_value THROTTLING_BAN_PERIOD 60)"
-    throttling_block="$(security_value THROTTLING_BLOCK_BAD_REQUEST true)"
+    throttling_static="${THROTTLING_STATIC_REQ_PER_SEC:-40}"
+    throttling_dynamic="${THROTTLING_DYNAMIC_REQ_PER_SEC:-20}"
+    throttling_out="${THROTTLING_OUT_BANDWIDTH:-0}"
+    throttling_in="${THROTTLING_IN_BANDWIDTH:-0}"
+    throttling_soft="${THROTTLING_SOFT_LIMIT:-15}"
+    throttling_hard="${THROTTLING_HARD_LIMIT:-20}"
+    throttling_grace="${THROTTLING_GRACE_PERIOD:-15}"
+    throttling_ban="${THROTTLING_BAN_PERIOD:-60}"
+    throttling_block="${THROTTLING_BLOCK_BAD_REQUEST:-true}"
 
     if [[ "${THROTTLING,,}" == true ]]; then
         validate_nonnegative_integer THROTTLING_STATIC_REQ_PER_SEC "$throttling_static"
@@ -198,7 +137,7 @@ write_security_config() {
     fi
 
     cat > "$config_file" <<EOF
-# Generated from global .env toggles and .security.conf. Do not edit.
+# Generated from global .env security settings. Do not edit.
 perClientConnLimit {
     staticReqPerSec         $throttling_static
     dynReqPerSec            $throttling_dynamic
@@ -213,13 +152,13 @@ perClientConnLimit {
 EOF
 
     if [[ "${RECAPTCHA,,}" == true ]]; then
-        recaptcha_type="$(normalize_recaptcha_type "$(security_value RECAPTCHA_TYPE invisible)")"
-        recaptcha_site_key="$(security_value RECAPTCHA_SITE_KEY '')"
-        recaptcha_secret_key="$(security_value RECAPTCHA_SECRET_KEY '')"
-        recaptcha_max_tries="$(security_value RECAPTCHA_MAX_TRIES 3)"
-        recaptcha_robot_hits="$(security_value RECAPTCHA_ALLOWED_ROBOT_HITS 3)"
-        recaptcha_connection_limit="$(security_value RECAPTCHA_CONNECTION_LIMIT 15000)"
-        recaptcha_ssl_connection_limit="$(security_value RECAPTCHA_SSL_CONNECTION_LIMIT 10000)"
+        recaptcha_type="$(normalize_recaptcha_type "${RECAPTCHA_TYPE:-invisible}")"
+        recaptcha_site_key="${RECAPTCHA_SITE_KEY:-}"
+        recaptcha_secret_key="${RECAPTCHA_SECRET_KEY:-}"
+        recaptcha_max_tries="${RECAPTCHA_MAX_TRIES:-3}"
+        recaptcha_robot_hits="${RECAPTCHA_ALLOWED_ROBOT_HITS:-3}"
+        recaptcha_connection_limit="${RECAPTCHA_CONNECTION_LIMIT:-15000}"
+        recaptcha_ssl_connection_limit="${RECAPTCHA_SSL_CONNECTION_LIMIT:-10000}"
         validate_recaptcha_key RECAPTCHA_SITE_KEY "$recaptcha_site_key"
         validate_recaptcha_key RECAPTCHA_SECRET_KEY "$recaptcha_secret_key"
         validate_positive_integer RECAPTCHA_MAX_TRIES "$recaptcha_max_tries"
@@ -395,8 +334,6 @@ validate_socket RECAPTCHA "$RECAPTCHA"
 validate_socket MODSECURITY "$MODSECURITY"
 PROXY_METHOD="$(normalize_proxy_method PROXY_METHOD "$PROXY_METHOD")"
 HEADER_SET="$(normalize_header_operation HEADER_SET "$HEADER_SET" "$PROXY_METHOD")"
-resolve_security_settings_file
-load_security_settings
 
 if [[ "${PROXY_SOCKET,,}" == true ]]; then
     validate_host "$PROXY_SOCKET_IP"

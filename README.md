@@ -23,11 +23,10 @@ git clone https://github.com/litespeedtech/ols-proxy-docker-env.git
 cd ols-proxy-docker-env
 ```
 
-Copy the environment and security configuration examples, then edit the values:
+Copy the environment file and edit the values:
 
 ```sh
 cp .env.example .env
-cp .security.conf.example .security.conf
 ```
 
 ```dotenv
@@ -126,15 +125,15 @@ docker compose up -d --build
 
 ## Global security controls
 
-Security controls are global by design and apply to every domain, including domains added through `domains.conf`. `.env` contains only the feature switches. Runtime security settings and CAPTCHA keys live in the local `.security.conf`, created from the tracked [.security.conf.example](.security.conf.example); `.security.conf` is ignored by Git.
+Security controls are global by design and apply to every domain, including domains added through `domains.conf`. They are configured only in `.env` and are never read from `domains.conf`.
 
-After changing `.security.conf`, restart the proxy with `docker compose restart ols-proxy`.
+After changing `.env`, recreate the proxy with `docker compose down` followed by `docker compose up -d`.
 
-`THROTTLING=true` enables OpenLiteSpeed per-client limits using the values in `.security.conf`.
+`THROTTLING=true` enables OpenLiteSpeed per-client limits using the `THROTTLING_*` values in `.env`.
 
-`RECAPTCHA=true` enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in `.security.conf` is reached.
+`RECAPTCHA=true` enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in `.env` is reached. It requires `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY`.
 
-`MODSECURITY=true` enables the OpenLiteSpeed ModSecurity engine and OWASP Core Rule Set (CRS). The CRS version is selected only at build time through `OWASP_CRS_VERSION` (default `4.21.0`) and is recorded in the image; it is not stored in `.security.conf`. Changing it requires rebuilding with the desired build argument, for example `OWASP_CRS_VERSION=4.21.0 docker compose up -d --build`.
+`MODSECURITY=true` enables the OpenLiteSpeed ModSecurity engine and OWASP Core Rule Set (CRS). The CRS version is selected only at build time through `OWASP_CRS_VERSION` (default `4.21.0`). Changing it requires rebuilding with the desired `.env` value, for example `docker compose up -d --build`.
 
 ## Application Examples
 
