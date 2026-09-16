@@ -23,10 +23,11 @@ git clone https://github.com/litespeedtech/ols-proxy-docker-env.git
 cd ols-proxy-docker-env
 ```
 
-Copy the example environment file and edit the values:
+Copy the environment and security configuration examples, then edit the values:
 
 ```sh
 cp .env.example .env
+cp .security.conf.example .security.conf
 ```
 
 ```dotenv
@@ -122,6 +123,18 @@ Changing `domains.conf` only requires restarting the container. Changing `Docker
 ```sh
 docker compose up -d --build
 ```
+
+## Global security controls
+
+Security controls are global by design and apply to every domain, including domains added through `domains.conf`. `.env` contains only the feature switches. Runtime security settings and CAPTCHA keys live in the local `.security.conf`, created from the tracked [.security.conf.example](.security.conf.example); `.security.conf` is ignored by Git.
+
+After changing `.security.conf`, restart the proxy with `docker compose restart ols-proxy`.
+
+`THROTTLING=true` enables OpenLiteSpeed per-client limits using the values in `.security.conf`.
+
+`RECAPTCHA=true` enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in `.security.conf` is reached.
+
+`MODSECURITY=true` enables the OpenLiteSpeed ModSecurity engine and OWASP Core Rule Set (CRS). The CRS version is selected only at build time through `OWASP_CRS_VERSION` (default `4.21.0`) and is recorded in the image; it is not stored in `.security.conf`. Changing it requires rebuilding with the desired build argument, for example `OWASP_CRS_VERSION=4.21.0 docker compose up -d --build`.
 
 ## Application Examples
 

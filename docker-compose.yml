@@ -4,6 +4,7 @@ services:
       context: .
       args:
         OLS_IMAGE: ${OLS_IMAGE:-litespeedtech/openlitespeed:latest}
+        OWASP_CRS_VERSION: ${OWASP_CRS_VERSION:-4.21.0}
     env_file:
       - .env
     environment:
@@ -16,6 +17,7 @@ services:
     volumes:
       - lsws_data:/usr/local/lsws
       - ./domains.conf:/etc/ols-proxy/domains.conf:ro
+      - ./.security.conf:/etc/ols-proxy/security.conf:ro
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
