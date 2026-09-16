@@ -31,6 +31,7 @@ RUN install -D -m 0644 /usr/local/lsws/modules/mod_security.so /opt/ols-proxy/mo
 COPY docker-entrypoint.sh /usr/local/bin/ols-proxy-entrypoint.sh
 COPY domains.conf /etc/ols-proxy/domains.conf
 COPY .security.conf.example /etc/ols-proxy/security.conf
+COPY .security.conf.example /opt/ols-proxy/security.conf.default
 RUN sed -i 's/\r$//' /usr/local/bin/ols-proxy-entrypoint.sh \
     && chmod +x /usr/local/bin/ols-proxy-entrypoint.sh
 

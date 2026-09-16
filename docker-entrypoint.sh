@@ -145,6 +145,21 @@ security_value() {
     printf '%s' "${SECURITY_VALUES[$name]:-$default_value}"
 }
 
+resolve_security_settings_file() {
+    if [[ -f "$SECURITY_SETTINGS_FILE" ]]; then
+        return
+    fi
+
+    if [[ "${THROTTLING,,}" == true || "${RECAPTCHA,,}" == true || "${MODSECURITY,,}" == true ]]; then
+        echo "$SECURITY_SETTINGS_FILE is required when a global security feature is enabled; copy .security.conf.example to .security.conf" >&2
+        exit 1
+    fi
+
+    SECURITY_SETTINGS_FILE=/opt/ols-proxy/security.conf.default
+    [[ -f "$SECURITY_SETTINGS_FILE" ]] || { echo "Default security configuration is missing from the image" >&2; exit 1; }
+    echo "WARNING: .security.conf is not present; using the image's safe security defaults" >&2
+}
+
 write_security_config() {
     local config_file="$1"
     local throttling_static throttling_dynamic throttling_out throttling_in
@@ -380,6 +395,7 @@ validate_socket RECAPTCHA "$RECAPTCHA"
 validate_socket MODSECURITY "$MODSECURITY"
 PROXY_METHOD="$(normalize_proxy_method PROXY_METHOD "$PROXY_METHOD")"
 HEADER_SET="$(normalize_header_operation HEADER_SET "$HEADER_SET" "$PROXY_METHOD")"
+resolve_security_settings_file
 load_security_settings
 
 if [[ "${PROXY_SOCKET,,}" == true ]]; then
