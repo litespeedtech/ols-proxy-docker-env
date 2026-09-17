@@ -131,7 +131,7 @@ After changing `.env`, recreate the proxy with `docker compose down` followed by
 
 `THROTTLING=true` enables OpenLiteSpeed per-client limits using the `THROTTLING_*` values in `.env`.
 
-`RECAPTCHA=true` enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in `.env` is reached. It requires `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY`.
+`RECAPTCHA=true` enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in `.env` is reached. `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` are optional; when blank, they are omitted from the generated OLS configuration.
 
 `MODSECURITY=true` enables the OpenLiteSpeed ModSecurity engine and OWASP Core Rule Set (CRS). The CRS version is selected only at build time through `OWASP_CRS_VERSION` (default `4.21.0`). Changing it requires rebuilding with the desired `.env` value, for example `docker compose up -d --build`.
 

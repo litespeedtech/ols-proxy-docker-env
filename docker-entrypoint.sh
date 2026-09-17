@@ -94,7 +94,7 @@ validate_recaptcha_key() {
     # Keys are inserted into an OLS config file. Restrict them to opaque token
     # characters so an environment value cannot add a directive or a block.
     if [[ ! "$value" =~ ^[A-Za-z0-9_-]{20,512}$ ]]; then
-        echo "$name must be a 20-512 character CAPTCHA key containing only letters, digits, _ or -" >&2
+        echo "$name must be a 20-512 character CAPTCHA key containing only letters, digits, _ or - when set" >&2
         exit 1
     fi
 }
@@ -159,8 +159,8 @@ EOF
         recaptcha_robot_hits="${RECAPTCHA_ALLOWED_ROBOT_HITS:-3}"
         recaptcha_connection_limit="${RECAPTCHA_CONNECTION_LIMIT:-15000}"
         recaptcha_ssl_connection_limit="${RECAPTCHA_SSL_CONNECTION_LIMIT:-10000}"
-        validate_recaptcha_key RECAPTCHA_SITE_KEY "$recaptcha_site_key"
-        validate_recaptcha_key RECAPTCHA_SECRET_KEY "$recaptcha_secret_key"
+        [[ -z "$recaptcha_site_key" ]] || validate_recaptcha_key RECAPTCHA_SITE_KEY "$recaptcha_site_key"
+        [[ -z "$recaptcha_secret_key" ]] || validate_recaptcha_key RECAPTCHA_SECRET_KEY "$recaptcha_secret_key"
         validate_positive_integer RECAPTCHA_MAX_TRIES "$recaptcha_max_tries"
         validate_nonnegative_integer RECAPTCHA_ALLOWED_ROBOT_HITS "$recaptcha_robot_hits"
         validate_positive_integer RECAPTCHA_CONNECTION_LIMIT "$recaptcha_connection_limit"
@@ -169,8 +169,18 @@ EOF
 
 lsrecaptcha {
     enabled                 1
+EOF
+        if [[ -n "$recaptcha_site_key" ]]; then
+            cat >> "$config_file" <<EOF
     siteKey                 $recaptcha_site_key
+EOF
+        fi
+        if [[ -n "$recaptcha_secret_key" ]]; then
+            cat >> "$config_file" <<EOF
     secretKey               $recaptcha_secret_key
+EOF
+        fi
+        cat >> "$config_file" <<EOF
     type                    $recaptcha_type
     maxTries                $recaptcha_max_tries
     allowedRobotHits        $recaptcha_robot_hits
@@ -484,7 +494,9 @@ skip_block {
     next
 }
 
-/^[[:space:]]*(listener|vhTemplate|lsrecaptcha|perClientConnLimit)[[:space:]]+[^\{]+\{/ || /^[[:space:]]*module[[:space:]]+mod_security[[:space:]]*\{/ {
+# listener and vhTemplate blocks have names, whereas these global security
+# blocks do not. Match them separately so inherited OLS defaults are removed.
+/^[[:space:]]*(listener|vhTemplate)[[:space:]]+[^\{]+\{/ || /^[[:space:]]*(lsrecaptcha|perClientConnLimit)[[:space:]]*\{/ || /^[[:space:]]*module[[:space:]]+mod_security[[:space:]]*\{/ {
     block_depth = brace_delta($0)
     skip_block = 1
     next
