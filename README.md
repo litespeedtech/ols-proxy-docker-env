@@ -50,20 +50,22 @@ Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By defaul
 `PROXY_METHOD=context` uses an OpenLiteSpeed proxy context.
 `PROXY_METHOD=rewrite` uses the default RewriteRule proxy. 
 
-Context mode optionally accepts one OLS header operation through `HEADER_SET`, for example:
+<details>
+  <summary>Header Set</summary>
+  Context mode optionally accepts one OLS header operation through HEADER_SET, for example:
 
-```dotenv
-PROXY_METHOD=context
-HEADER_SET=X-XSS-Protection 1;mode=block
-```
+  ```dotenv
+  PROXY_METHOD=context
+  HEADER_SET=X-XSS-Protection 1;mode=block
+  ```
 
-Supported syntax:
+  Supported syntax:
 
-```text
-<Header|RequestHeader> <set|append|merge|add|unset> <header-name> ["value"]
-```
+  ```text
+  <Header|RequestHeader> <set|append|merge|add|unset> <header-name> ["value"]
+  ```
 
-For a response header, `Header set` may be omitted. For example, `X-XSS-Protection 1;mode=block` is treated as `Header set X-XSS-Protection 1;mode=block`. A colon after the header name is optional. 
+</details>
 
 ## Connect another Docker stack
 
@@ -128,12 +130,55 @@ docker compose up -d --build
 Security controls are global by design and apply to every domain, including domains added through `domains.conf`. They are configured only in `.env` and are never read from `domains.conf`.
 
 After changing `.env`, recreate the proxy with `docker compose down` followed by `docker compose up -d`.
+<details>
+  <summary>Per-client throttling</summary>
+  THROTTLING=true enables OpenLiteSpeed per-client limits using the THROTTLING_* values in .env.
+  
+  Default values:
+  ```
+  THROTTLING=false
+  THROTTLING_STATIC_REQ_PER_SEC=1000
+  THROTTLING_DYNAMIC_REQ_PER_SEC=50
+  THROTTLING_OUT_BANDWIDTH=0
+  THROTTLING_IN_BANDWIDTH=0
+  THROTTLING_SOFT_LIMIT=50
+  THROTTLING_HARD_LIMIT=100
+  THROTTLING_BLOCK_BAD_REQUEST=true
+  THROTTLING_GRACE_PERIOD=15
+  THROTTLING_BAN_PERIOD=60
+  ```
+</details>
 
-`THROTTLING=true` enables OpenLiteSpeed per-client limits using the `THROTTLING_*` values in `.env`.
+<details>
+  <summary>reCAPTCHA</summary>
+  RECAPTCHA=true enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in .env is reached. RECAPTCHA_SITE_KEY and RECAPTCHA_SECRET_KEY are optional.
+  
+  Default values:
+  ```
+  RECAPTCHA=false
+  RECAPTCHA_TYPE=checkbox
+  RECAPTCHA_SITE_KEY=
+  RECAPTCHA_SECRET_KEY=
+  RECAPTCHA_MAX_TRIES=10
+  RECAPTCHA_ALLOWED_ROBOT_HITS=100
+  RECAPTCHA_CONNECTION_LIMIT=100
+  RECAPTCHA_SSL_CONNECTION_LIMIT=100
+  ```
+</details>
 
-`RECAPTCHA=true` enables OpenLiteSpeed CAPTCHA when either configured concurrent-connection limit in `.env` is reached. `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` are optional; when blank, they are omitted from the generated OLS configuration.
+<details>
+  <summary>OWASP</summary>
+  MODSECURITY=true enables the OpenLiteSpeed ModSecurity engine and OWASP Core Rule Set (CRS). The CRS version is selected only at build time through OWASP_CRS_VERSION. Changing it requires rebuilding with the desired .env value, for example:
+  ```
+  docker compose up -d --build
+  ```
 
-`MODSECURITY=true` enables the OpenLiteSpeed ModSecurity engine and OWASP Core Rule Set (CRS). The CRS version is selected only at build time through `OWASP_CRS_VERSION` (default `4.21.0`). Changing it requires rebuilding with the desired `.env` value, for example `docker compose up -d --build`.
+  Default values:
+  ```
+  MODSECURITY=false
+  OWASP_CRS_VERSION=4.21.0
+  ```
+</details>
 
 ## Application Examples
 
