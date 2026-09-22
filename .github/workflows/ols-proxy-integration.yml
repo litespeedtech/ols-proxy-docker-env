@@ -35,6 +35,9 @@ jobs:
             'headers.example.test, test-backend, 8080, false, context, append Cache-Control "no-store"' \
             > domains.conf
 
+      - name: Create shared Docker network
+        run: docker network inspect ls-net >/dev/null 2>&1 || docker network create ls-net
+
       - name: Validate Compose configuration
         run: docker compose config
 
