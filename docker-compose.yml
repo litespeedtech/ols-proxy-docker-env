@@ -20,8 +20,6 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
-    networks:
-      - ls-net
 
 volumes:
   lsws_data:
@@ -29,3 +27,4 @@ volumes:
 networks:
   ls-net:
     name: ls-net
+    external: true

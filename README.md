@@ -68,9 +68,20 @@ Set `PROXY_SOCKET=true` to add an OpenLiteSpeed WebSocket proxy block. By defaul
 
 </details>
 
-## Connect another Docker stack
 
-Compose creates a shared bridge network named `ls-net`. Any backend container that should be reached by its Docker service or container name must join this network.
+## Docker network setup
+
+The proxy and backend applications use a shared **external Docker network** named `ls-net`.
+
+Create the network before starting the proxy or any application that uses it:
+
+```sh
+docker network inspect ls-net >/dev/null 2>&1 || docker network create ls-net
+```
+
+This command creates `ls-net` only if it does not already exist.
+
+## Connect another Docker stack
 
 1. For a backend in another Compose project, add the external network to that project's `docker-compose.yml`:
 
@@ -88,7 +99,8 @@ Compose creates a shared bridge network named `ls-net`. Any backend container th
     BACKEND_PORT=8080
     ```
 
-3. For a container started with `docker run`, attach it to the shared network:
+### Docker Run
+    For a container started with `docker run`, attach it to the shared network:
 
     ```sh
     docker network connect ls-net <backend-container-name>
