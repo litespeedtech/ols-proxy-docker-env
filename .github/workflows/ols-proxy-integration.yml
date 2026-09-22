@@ -2,7 +2,7 @@ name: proxy-test
 
 on:
   workflow_dispatch:
-  
+
   pull_request:
     paths-ignore:
       - 'README.md'
@@ -29,12 +29,12 @@ jobs:
             -e 's/^BACKEND_PORT=.*/BACKEND_PORT=8080/' \
             -e 's/^DOMAIN=.*/DOMAIN=test.example.test/' \
             -e 's/^ACME_EMAIL=.*/ACME_EMAIL=/' \
-            -e 's/^PROXY_SOCKET=.*/PROXY_SOCKET=false/' \
+            -e 's/^PROXY_SOCKET=.*/PROXY_SOCKET=true/' \
             -e 's/^PROXY_METHOD=.*/PROXY_METHOD=rewrite/' \
             .env
           printf '%s\n' \
-            'context.example.test, test-backend, 8080, false, context, RequestHeader set Origin "https://www.example.com"' \
-            'headers.example.test, test-backend, 8080, false, context, append Cache-Control "no-store"' \
+            'context.example.test, test-backend, 8080, true, context, RequestHeader set Origin "https://www.example.com"' \
+            'headers.example.test, test-backend, 8080, true, context, append Cache-Control "no-store"' \
             > domains.conf
 
       - name: Create shared Docker network

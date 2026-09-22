@@ -25,6 +25,6 @@ volumes:
   lsws_data:
 
 networks:
-  ls-net:
+  default:
     name: ls-net
     external: true
