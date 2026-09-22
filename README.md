@@ -102,9 +102,9 @@ This command creates `ls-net` only if it does not already exist.
 ### Docker Run
     For a container started with `docker run`, attach it to the shared network:
 
-    ```sh
-    docker network connect ls-net <backend-container-name>
-    ```
+```sh
+docker network connect ls-net <backend-container-name>
+```
 
 Use the container's internal listening port, not a host port mapping. For example, a `3000:8080` mapping is reached from OLS as `backend:8080` when both containers use `ls-net`.
 
